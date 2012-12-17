@@ -51,9 +51,6 @@ def calculate_score_given_temp(temp,scoredict):
 def sort_into_bins(data, numbins=10, minv=0, maxv=100):
 #binning
 
-  #minv = min(data)
-  #maxv = max(data)
-
   bincounts = []
   for i in range(numbins+1):
     bincounts.append(0)
@@ -123,23 +120,34 @@ def create_rounded_hourly_temp_dict_for_each_day(rawdict):
 
 
 
-def calculate_comfort_score(hourlyTempDict,scoreRefdict):
+def calculate_comfort_score(cityName, hourlyTempDict,scoreRefdict):
+
+  listOfHourlyScores = []
   cumulativeScore = 0
   numhrlyDataPoints = 0
-  cityScoreDict = {}
+  cityDailyScoreDict = {}
   for dt, tD in hourlyTempDict.items():
     dayscore = 0
     for temp in tD.values():
       score = calculate_score_given_temp(temp,scoreRefdict)
       dayscore +=score
       cumulativeScore += score
+      listOfHourlyScores.append(score)
     numhrlyDataPoints += len(tD)
     #print dt, "had ", len(tD), "data points for a score of ", (dayscore/len(tD))
-    cityScoreDict[dt] = (dayscore/len(tD))  # {date: day's score}
+    cityDailyScoreDict[dt] = (dayscore/len(tD))  # {date: day's score}
+
+
+  bincounts = sort_into_bins(listOfHourlyScores, numbins=10, minv=0, maxv=100)
     
-  comf = (cumulativeScore/numhrlyDataPoints)
-  print "Overall score is", comf , cumulativeScore, numhrlyDataPoints, "Numhours"
-  return  cityScoreDict
+  Hcomf = (cumulativeScore/numhrlyDataPoints)
+  print "Overall score is", Hcomf , cumulativeScore, "for ", numhrlyDataPoints, "Numhours"
+
+  return  (cityDailyScoreDict, bincounts)
+
+
+
+
 
 def create_Hourly_Temp_Dict_for_city(f):
 
@@ -151,6 +159,8 @@ def create_Hourly_Temp_Dict_for_city(f):
     dtdict = create_rounded_hourly_temp_dict_for_each_day(onedaysdict)
     hourlyTempDict[dt] = dtdict
   print "Hourly Temp Dict is now ready for all dates\n"  
+
+
 
   return hourlyTempDict
 
@@ -204,25 +214,40 @@ def compare_two_cityScores(cSD1, cSD2):
   for ind, b in enumerate(bincounts):
     print ind*10, b
 
-if __name__ == '__main__':
-#  os.system('clear')
-  rawDirPath = r'ra_score.csv'
-  f = open(rawDirPath, 'r')
-  scoreRefdict = read_user_scoreDict(f)
-  f.close()
-  print "Finished reading User Scoring Scheme\n"
 
-  ################
+
+
+def  print_binned_scores(cName,bincounts):
+  '''
+  assumes that the binning has already occurred
+  '''
+  print "\n\n For City :",cName
+  totaldpts = 0
+  for ind, b in enumerate(bincounts):
+    totaldpts+=b
+  print "Total data points", totaldpts
+  print("\n")
+
+  for ind, b in enumerate(bincounts):
+    print ind*10, (ind+1)*10, b, (b/totaldpts)*100
+
+
+
+def create_city_file_list():
+  cityList = []
+
   rawDirPath1 = r'KILSCHAU1.csv'
   rawDirPath2 = r'KCASUNNY13.csv'
 
 #  rawDirPath1 = r'KFLMIAMI88.csv'
-  rawDirPath2 = r'KVARICHM29.csv'
+#  rawDirPath2 = r'KVARICHM29.csv'
+#  rawDirPath2 = r'KFLMIAMI43.csv'
 
   city=[]
   city.append("Schaumburg, IL")
-#  city.append("Sunnyvale, CA")
-  city.append("RIC, VA")
+#  city.append("Miami, FL")
+  city.append("Sunnyvale, CA")
+#  city.append("RIC, VA")
 
   ################
   
@@ -232,27 +257,53 @@ if __name__ == '__main__':
   f2 = open(rawDirPath2, 'r')
   flist.append(f2)
   
+
+
+  return (cityList, flist)  
+
+
+
+if __name__ == '__main__':
+#  os.system('clear')
+  rawDirPath = r'ra_score.csv'
+  f = open(rawDirPath, 'r')
+  scoreRefdict = read_user_scoreDict(f)
+  f.close()
+  print "Finished reading User Scoring Scheme\n"
+
+  ################
+  (cityList, flist) = create_city_file_list()
+
   cityHrTempDictList = []
   for f in flist:
     hourlyTempDict = create_Hourly_Temp_Dict_for_city(f)
     cityHrTempDictList.append(hourlyTempDict)
 
-  ctyScoreDictList = []  
-  for ind, cityDict in enumerate(cityHrTempDictList):
-    print "\n\n City :",city[ind]
-    cityScoreDict = calculate_comfort_score(cityDict, scoreRefdict)
-    ctyScoreDictList.append(cityScoreDict)
+  #ctyScoreDictList = []  
+  #for ind, cityDict in enumerate(cityHrTempDictList):
+    #print "\n\n City :",city[ind]
+    #cityScoreDict = calculate_comfort_score(cityDict, scoreRefdict)
+    #ctyScoreDictList.append(cityScoreDict)
 
-  cSD2 = ctyScoreDictList[1] #dict for the 2nd city
-  cSD1 = ctyScoreDictList[0] #dict for the 1st city
+  #cSD2 = ctyScoreDictList[1] #dict for the 2nd city
+  #cSD1 = ctyScoreDictList[0] #dict for the 1st city
 
-  compare_two_cityScores(cSD1, cSD2)
+  #compare_two_cityScores(cSD1, cSD2)
 
 
-  calculate_comfort_score(cityHrTempDictList[0],scoreRefdict)
-  calculate_comfort_score(cityHrTempDictList[1],scoreRefdict)
 
-  #data = [1,33, 44,0,-56,100,99]
-  #bincounts = sort_into_bins(data, numbins=10, minv=0, maxv=100)
+  (cityDSDict, bincounts) = calculate_comfort_score(city[0],cityHrTempDictList[0],scoreRefdict)
+  print_binned_scores(city[0],bincounts)
+    
+   
+
+
+  (cityDSDict, bincounts) = calculate_comfort_score(city[1],cityHrTempDictList[1],scoreRefdict)
+  print_binned_scores(city[1],bincounts)
+
+
+    
+
+
 
 
