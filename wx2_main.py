@@ -99,6 +99,8 @@ def  create_daily_raw_temp_dicts(fi):
     print len(tlines), "Number of raw lines in file"
   
     for l in tlines:
+      if l:
+        #print("parsing %s" % l)
         dte = l.split()[0] #datestring
         rowsperDay[dte] += 1
     
@@ -109,22 +111,26 @@ def  create_daily_raw_temp_dicts(fi):
     raw_daily_dict = {}
     tempdict = {}
     for d in range(len(rowsperDay)): #one loop for each date in the file
-        l = tlines[start] #first line in file for that date
-        dte = l.split()[0] #datestring
-        numrows = rowsperDay[dte]
-        end = start+numrows
+      #print l, start
+      l = tlines[start] #first line in file for that date
+      dte = l.split()[0] #datestring
+      numrows = rowsperDay[dte]
+      end = start+numrows
         #print "new date", dte, "has ",numrows," rows"
-        for l in tlines[start:end]:
-            dte = l.split()[0] #datestring
-            hour = l.split()[1].split(",")[0] #timestamp
-            hr = int(hour.split(":")[0]) #rounded to the floor hour
-            temp = float(l.split()[1].split(",")[1])  #temp as a float
-            tempdict[hour] = temp
+      for l in tlines[start:end]:
+        try:            
+          dte = l.split()[0] #datestring
+          hour = l.split()[1].split(",")[0] #timestamp
+          hr = int(hour.split(":")[0]) #rounded to the floor hour
+          temp = float(l.split()[1].split(",")[1])  #temp as a float
+          tempdict[hour] = temp
+        except:
+          print("Unable to Parse %s start %d end %d" %  (l,start,end) )
         ###
-        raw_daily_dict[dte] = tempdict
+      raw_daily_dict[dte] = tempdict
         ###
-        start = end    
-        tempdict = {} #reset for next date in the file
+      start = end    
+      tempdict = {} #reset for next date in the file
     
     # print_dict(raw_daily_dict)
     return raw_daily_dict
@@ -192,6 +198,9 @@ def calculate_score_given_temp(temp,scoredict):
   return score
 
 
+
+#calculate score for ONE CITY, given its hTdictionary
+#output is a 3-term tuple, hcomf, dailyscoredict and the bins
 def calculate_comfort_score(cityName, hourlyTempDict,scoreRefdict):
 
   listOfHourlyScores = []
@@ -215,61 +224,19 @@ def calculate_comfort_score(cityName, hourlyTempDict,scoreRefdict):
   Hcomf = (cumulativeScore/numhrlyDataPoints)
   print "Overall score is", Hcomf , cumulativeScore, "for ", numhrlyDataPoints, "Numhours"
 
-  return  (cityDailyScoreDict, binbounds)
+  return  (Hcomf, cityDailyScoreDict, binbounds)
 
 
 
 
 
-
-
-
-
+#NOT USED
 def compare_two_cityScores(cSD1, cSD2):
   '''
   given two scity score dicts, how do the scores compare?
   '''
-  for dt,sc in cSD1.items():
-    try:
-      print dt, city[0], sc, city[1], cSD2[dt]
-    except:
-      print "missing data for", dt
-
-  print len(cSD1), len(cSD2)
-
-  numZeroes0=0
-  numZeroes1=0
-  numCent0=0
-  numCent1=0
-  num70_0=0
-  num70_1=0
-
-
-  for k in cSD1.values():
-    if k==0:
-      numZeroes0+=1
-    if k>=50:
-      numCent0+=1
-    if k>=70:
-      num70_0+=1
-    print k,
-  print "\n"  
-
-  for k in cSD2.values():
-    if k==0:
-      numZeroes1+=1
-    if k>=50:
-      numCent1+=1
-    if k>=70:
-      num70_1+=1
-    print k,
-    
   print "\nDays with score  0:", city[0], numZeroes0, city[1],numZeroes1
   print "\nDays with score >70: ", city[0], num70_0, city[1],num70_1
-
-  bincounts = sort_into_bins(cSD2.values(), numbins=10, minv=0, maxv=100)
-  for ind, b in enumerate(bincounts):
-    print ind*10, b
 
 
 
@@ -290,9 +257,29 @@ def  print_binned_scores(cName,binbounds):
   print "Total data points", totaldpts
   print("\n")
 
+  print "Low, High, NumHrs, Percent"
   for ind, b in enumerate(bincounts):
     print low[ind], high[ind], b, (b/totaldpts)*100
 
+
+def    write_to_file_binned_scores(fname, cName, citycomf, binbounds):
+  fo = open(fname, "a+") #append
+
+  fo.write( "\n\n ComfortScore For City :%s is %.2f\n" % (cName, citycomf))
+  totaldpts = 0
+  bincounts = binbounds[2]
+  low = binbounds[0]
+  high = binbounds[1]
+
+  for ind, b in enumerate(bincounts):
+    totaldpts+=b
+  fo.write( "Total data points %d \n"% totaldpts)
+
+  fo.write( "Low, High, NumHrs, Percent\n")
+  for ind, b in enumerate(bincounts):
+    fo.write("%d, %d, %d, %.2f \n"% (low[ind], high[ind], b, (b/totaldpts)*100))
+
+  fo.close()
 
 
 # How many data points are missing for each hour
@@ -304,6 +291,8 @@ def input_data_profile(cTD):
             cityDataProfile[h] += 1
 
     return cityDataProfile
+
+
 
 
 
@@ -320,16 +309,20 @@ if __name__ == '__main__':
   print "Finished reading City FileNames\n"
   print_list(cityList)
 
+
+  fname = "cityScores.csv"
+  fo = open(fname, "w") 
   cityHrTempDictList = []
   for ind, f in enumerate(flist):
     print "\n\n\n", cityList[ind]
     hourlyTempDict = create_Hourly_Temp_Dict_for_city(f)
     cityHrTempDictList.append(hourlyTempDict)
-    (cityDSDict, binbounds) = calculate_comfort_score(cityList[ind],cityHrTempDictList[ind],scoreRefdict)
+    (citycomf, cityDSDict, binbounds) = calculate_comfort_score(cityList[ind],cityHrTempDictList[ind],scoreRefdict)
     print_binned_scores(cityList[ind],binbounds)
+    write_to_file_binned_scores(fname, cityList[ind], citycomf, binbounds)
+  print "Finished writing: ",fname
 
-
-  fname = "dataprofile.csv"
+  fname = "dataQuality.csv"
   fo = open(fname, "w") 
 
   # Pickling
@@ -345,6 +338,7 @@ if __name__ == '__main__':
 
    
   fo.close()
+  print "Finished writing: ",fname
 
   ##########
   #
