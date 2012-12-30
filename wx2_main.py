@@ -5,7 +5,9 @@ import os
 import time
 import sys
 import math
+import re
 from collections import defaultdict #automatically initializes to zero
+
 
 
 logging.basicConfig(level=logging.DEBUG, filename='wx.log')
@@ -78,10 +80,14 @@ def create_city_file_lists(fName):
     lines = df.readlines()
 
     for l in lines:
-        toks = l.split()
+      if l.strip() != "" : #taking care of blank lines
+        print "City:", l
+        # toks = l.split()
+        toks = [x.strip() for x in l.split(',')] #break at the commas, then strip out blanks
         cityList.append(toks[0]+toks[1])      
-        fc = open(toks[2],'r')
+        fc = open('data/'+toks[2],'r')
         flist.append(fc)
+
     return (cityList, flist)  
 
 
@@ -95,25 +101,45 @@ def  create_daily_raw_temp_dicts(fi):
     rowsperDay = defaultdict(int)
     tlines = fi.readlines()[1:] #reads one line at a time, skip the header row  
 
+    pattern = r"NA"
+
     totlines =len(tlines)
     print len(tlines), "Number of raw lines in file"
   
     for l in tlines:
       if l:
+        #drop lines that have an NA for the temperature value
+        toks = l.split(',')
+        for t in toks:
+          if re.match(pattern, t):   #the tok is an NA     
+            tlines.remove(l) #drop the line
+            print "skipping line:",l
+            continue
+
         #print("parsing %s" % l)
         dte = l.split()[0] #datestring
+        if "NA" in dte: 
+          print "skipping line", l
+          continue
         rowsperDay[dte] += 1
-    
-#now we know how many data points per day
-  # print_dict(rowsperDay)
+        #print "added date ", dte
+
+    print len(rowsperDay), "Number of unique days in file"    
+    # now we know how many data points per day
+    #    print_dict(rowsperDay)
+    #sys.exit(0)
 
     start = 0
     raw_daily_dict = {}
     tempdict = {}
+
     for d in range(len(rowsperDay)): #one loop for each date in the file
-      #print l, start
+      #print d, start, "should go up to",len(rowsperDay) #this sometimes spills over to the next year. need to delete those lines
       l = tlines[start] #first line in file for that date
+      
+
       dte = l.split()[0] #datestring
+      #print dte, "starts at", start
       numrows = rowsperDay[dte]
       end = start+numrows
         #print "new date", dte, "has ",numrows," rows"
@@ -129,6 +155,7 @@ def  create_daily_raw_temp_dicts(fi):
         ###
       raw_daily_dict[dte] = tempdict
         ###
+      #print "Done with ",dte
       start = end    
       tempdict = {} #reset for next date in the file
     
@@ -222,8 +249,7 @@ def calculate_comfort_score(cityName, hourlyTempDict,scoreRefdict):
   binbounds = sort_into_bins(listOfHourlyScores, numbins=10, minv=0, maxv=100)
     
   Hcomf = (cumulativeScore/numhrlyDataPoints)
-  print "Overall score is", Hcomf , cumulativeScore, "for ", numhrlyDataPoints, "Numhours"
-
+  print("Overall score is %.2f, %d for %d Numhours" % (Hcomf , cumulativeScore, numhrlyDataPoints))
   return  (Hcomf, cityDailyScoreDict, binbounds)
 
 
@@ -259,10 +285,9 @@ def  print_binned_scores(cName,binbounds):
 
   print "Low, High, NumHrs, Percent"
   for ind, b in enumerate(bincounts):
-    print low[ind], high[ind], b, (b/totaldpts)*100
+    print("%d, %d, %d, %.2f"% (low[ind], high[ind], b, (b/totaldpts)*100))
 
-
-def    write_to_file_binned_scores(fname, cName, citycomf, binbounds):
+def  write_to_file_binned_scores(fname, cName, citycomf, binbounds):
   fo = open(fname, "a+") #append
 
   fo.write( "\n\n ComfortScore For City :%s is %.2f\n" % (cName, citycomf))
@@ -274,7 +299,6 @@ def    write_to_file_binned_scores(fname, cName, citycomf, binbounds):
   for ind, b in enumerate(bincounts):
     totaldpts+=b
   fo.write( "Total data points %d \n"% totaldpts)
-
   fo.write( "Low, High, NumHrs, Percent\n")
   for ind, b in enumerate(bincounts):
     fo.write("%d, %d, %d, %.2f \n"% (low[ind], high[ind], b, (b/totaldpts)*100))
@@ -282,7 +306,8 @@ def    write_to_file_binned_scores(fname, cName, citycomf, binbounds):
   fo.close()
 
 
-# How many data points are missing for each hour
+# How many data points are missing for each hour?
+# Returns: A dict with key = hour (0..23) and value to #dpts
 def input_data_profile(cTD):
     cityDataProfile = defaultdict(int)
 
@@ -294,46 +319,59 @@ def input_data_profile(cTD):
 
 
 
+def write_to_file_number_of_hourly_data_points(fname, _city, _dict):
+
+    fo = open(fname, "a+") #append
+    for k,v in _dict.items():
+        fo.write("%s, %s , %s\n " % (_city, k , v))
+    fo.write("\n")
+    fo.close()
 
 
 if __name__ == '__main__':
-  os.system('clear')
-  rawDirPath = r'ra_score.csv'
-  f = open(rawDirPath, 'r')
+#  os.system('clear')
+
+  ifName = 'data/input_ra_score.csv'
+  f = open(ifName, 'r')
   scoreRefdict = read_user_scoreDict(f)
   f.close()
 
   ################
-  dfName = 'citydatafiles.csv'
+  dfName = 'data/input_citydatafiles.csv'
   (cityList, flist) = create_city_file_lists(dfName)
   print "Finished reading City FileNames\n"
   print_list(cityList)
 
 
-  fname = "cityScores.csv"
+  fname = "data/out_cityScores.csv"
   fo = open(fname, "w") 
   cityHrTempDictList = []
   for ind, f in enumerate(flist):
     print "\n\n\n", cityList[ind]
+
+    # Given a city temperature data file, make it into an Hourly Temp Dictionary
     hourlyTempDict = create_Hourly_Temp_Dict_for_city(f)
+
     cityHrTempDictList.append(hourlyTempDict)
     (citycomf, cityDSDict, binbounds) = calculate_comfort_score(cityList[ind],cityHrTempDictList[ind],scoreRefdict)
     print_binned_scores(cityList[ind],binbounds)
     write_to_file_binned_scores(fname, cityList[ind], citycomf, binbounds)
   print "Finished writing: ",fname
 
-  fname = "dataQuality.csv"
+  fname = "data/out_dataQuality.csv"
   fo = open(fname, "w") 
 
   # Pickling
   cDataProfileL = []  
   for ind,cTD in enumerate(cityHrTempDictList):
-      fo = open(fname, "a+") 
-      fo.write("City: %s %d\n" % (cityList[ind],len(cTD)))
-      fo.close()
+      #fo = open(fname, "a+") 
+      cName = cityList[ind]
+      #fo.write("City: %s %d\n" % (cName, len(cTD)))
+      #fo.close()
       cityDataProfile = input_data_profile(cTD)
+      write_to_file_number_of_hourly_data_points(fname, cName, cityDataProfile)
       #print_dict(cityDataProfile)
-      write_dict_to_file(fname, cityDataProfile)
+      #write_dict_to_file(fname, cityDataProfile)
       cDataProfileL.append(cityDataProfile)
 
    
