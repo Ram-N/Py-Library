@@ -84,7 +84,7 @@ def create_city_file_lists(fName):
         print "City:", l
         # toks = l.split()
         toks = [x.strip() for x in l.split(',')] #break at the commas, then strip out blanks
-        cityList.append(toks[0]+toks[1])      
+        cityList.append(toks[0]+" "+toks[1])      
         fc = open('data/'+toks[2],'r')
         flist.append(fc)
 
@@ -287,6 +287,8 @@ def  print_binned_scores(cName,binbounds):
   for ind, b in enumerate(bincounts):
     print("%d, %d, %d, %.2f"% (low[ind], high[ind], b, (b/totaldpts)*100))
 
+
+
 def  write_to_file_binned_scores(fname, cName, citycomf, binbounds):
   fo = open(fname, "a+") #append
 
@@ -321,11 +323,10 @@ def input_data_profile(cTD):
 
 def write_to_file_number_of_hourly_data_points(fname, _city, _dict):
 
-    fo = open(fname, "a+") #append
-    for k,v in _dict.items():
-        fo.write("%s, %s , %s\n " % (_city, k , v))
-    fo.write("\n")
-    fo.close()
+  fo = open(fname, "a+") #append
+  for k,v in _dict.items():
+    fo.write("%s, %s, %s\n" % (_city, k , v))
+  fo.close()
 
 
 if __name__ == '__main__':

@@ -42,11 +42,12 @@ mtype= "toner"
 skin = map("state")
 
 mp = get_map(location = 'USA', zoom = 4, maptype = mtype)
+mp = get_map(location = 'India', zoom = 5, maptype = mtype)
 
 #prefer bw maps so that our data can be easily seen
 mp = get_map(location = 'USA', zoom = 4, maptype = mtype, color="bw")
 mp <- ggmap(mp)
-mp<- mp+ geom_point( data=ll, aes(x=lon, y=lat, color=score), size=score/10)
+mp<- mp+ geom_point( data=ll, aes(x=lon, y=lat, color=score), size=score/12)
 mp<- mp  + scale_colour_continuous(low="blue", high="red")
 mp<- mp+geom_text(data=ll,aes(y=lat-1,label=cities), size=4)
 mp<- mp+geom_text(data=ll,aes(y=lat+1.5,label=round(score),color=score), size=5)
