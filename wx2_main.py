@@ -309,7 +309,7 @@ def  write_to_file_binned_scores(fname, cName, citycomf, binbounds):
 
 
 # How many data points are missing for each hour?
-# Returns: A dict with key = hour (0..23) and value to #dpts
+# Returns: A dict with key = hour (0..23) and value = #dpts
 def input_data_profile(cTD):
     cityDataProfile = defaultdict(int)
 
@@ -322,10 +322,20 @@ def input_data_profile(cTD):
 
 
 def write_to_file_number_of_hourly_data_points(fname, _city, _dict):
-
   fo = open(fname, "a+") #append
   for k,v in _dict.items():
     fo.write("%s, %s, %s\n" % (_city, k , v))
+  fo.close()
+
+
+#each row
+#City, Date, hour, Temp
+def write_to_file_hourly_temp_data(fname, _city, cTD):
+  fo = open(fname, "a+") #append
+
+  for dte, tempD in cTD.items():
+        for h,tem in tempD.items():
+          fo.write("%s, %s, %d, %d\n" % (_city, dte, h , int(round(tem,0)) ) )
   fo.close()
 
 
@@ -361,6 +371,10 @@ if __name__ == '__main__':
 
   fname = "data/out_dataQuality.csv"
   fo = open(fname, "w") 
+  f2name = "data/out_cityTemperatures.csv"
+  f2o = open(fname, "w") 
+  fo.close()
+  f2o.close()
 
   # Pickling
   cDataProfileL = []  
@@ -369,15 +383,19 @@ if __name__ == '__main__':
       cName = cityList[ind]
       #fo.write("City: %s %d\n" % (cName, len(cTD)))
       #fo.close()
+      # Returns: A dict with key = hour (0..23) and value = #dpts
       cityDataProfile = input_data_profile(cTD)
       write_to_file_number_of_hourly_data_points(fname, cName, cityDataProfile)
       #print_dict(cityDataProfile)
       #write_dict_to_file(fname, cityDataProfile)
       cDataProfileL.append(cityDataProfile)
 
-   
-  fo.close()
+      write_to_file_hourly_temp_data(f2name, cName, cTD)
+
+
+
   print "Finished writing: ",fname
+  print "Finished writing: ",f2name
 
   ##########
   #
