@@ -91,6 +91,17 @@ def create_city_file_lists(fName):
     return (cityList, flist)  
 
 
+def some_token_is_NA(_line):
+  pattern = r"NA"
+  toks = _line.split(',')
+  for t in toks:
+    if re.match(pattern, t):   #the tok is an NA
+      print "skipping line:",_line
+      return 1
+  return 0
+
+
+
 # First a raw temp dict is created for each city
 def  create_daily_raw_temp_dicts(fi):
     '''
@@ -101,28 +112,35 @@ def  create_daily_raw_temp_dicts(fi):
     rowsperDay = defaultdict(int)
     tlines = fi.readlines()[1:] #reads one line at a time, skip the header row  
 
-    pattern = r"NA"
-
     totlines =len(tlines)
     print len(tlines), "Number of raw lines in file"
   
     for l in tlines:
       if l:
-        #drop lines that have an NA for the temperature value
-        toks = l.split(',')
-        for t in toks:
-          if re.match(pattern, t):   #the tok is an NA     
-            tlines.remove(l) #drop the line
-            print "skipping line:",l
-            continue
+        #drop lines that have an NA for the temperature value or the date value
+        if some_token_is_NA(l):
+          tlines.remove(l) #drop the line
+          continue          
 
         #print("parsing %s" % l)
         dte = l.split()[0] #datestring
         if "NA" in dte: 
-          print "skipping line", l
+          print "skipping line with NA Date", l
+          tlines.remove(l) #drop the line
           continue
+
+        temperature = float(l.split(',')[1])
+        if temperature > 150 or temperature < -100:
+          print "skipping line Bad Temp value:", l
+          tlines.remove(l) #drop the line
+          continue
+          
+
         rowsperDay[dte] += 1
         #print "added date ", dte
+
+        
+
 
     print len(rowsperDay), "Number of unique days in file"    
     # now we know how many data points per day
@@ -370,11 +388,9 @@ if __name__ == '__main__':
   print "Finished writing: ",fname
 
   fname = "data/out_dataQuality.csv"
-  fo = open(fname, "w") 
   f2name = "data/out_cityTemperatures.csv"
-  f2o = open(fname, "w") 
-  fo.close()
-  f2o.close()
+  open(f2name,"w").close()
+  open(fname,"w").close()
 
   # Pickling
   cDataProfileL = []  
